@@ -1,5 +1,11 @@
 # Release notes
 
+# 0.2.7
+__New feature__:
+
+__Bug Fix__:
+- Support Merge on BigQuery
+
 # 0.2.6
 __New feature__:
 - Support XML Schema inference
