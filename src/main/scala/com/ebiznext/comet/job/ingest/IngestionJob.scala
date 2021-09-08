@@ -20,7 +20,8 @@ import com.google.cloud.bigquery.{
   Field,
   LegacySQLTypeName,
   Schema => BQSchema,
-  StandardTableDefinition
+  StandardTableDefinition,
+  Table
 }
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.feature.SQLTransformer
@@ -1003,6 +1004,52 @@ trait IngestionJob extends SparkJob {
   // Merge From BigQuery Data Source
   ///////////////////////////////////////////////////////////////////////////
 
+  private def updateBqTableSchema(table: Table, incomingSchema: StructType): Unit = {
+    val allowFieldAddition = Option(
+      session.conf.get("spark.datasource.bigquery.allowFieldAddition", "false")
+    ).exists(_.toBoolean)
+    val allowFieldRelaxation = Option(
+      session.conf.get("spark.datasource.bigquery.allowFieldRelaxation", "false")
+    ).exists(_.toBoolean)
+    val incomingFieldsMap = incomingSchema.fields.map(f => f.name -> f).toMap
+    val existingSchema =
+      table.getDefinition.asInstanceOf[StandardTableDefinition].getSchema.getFields()
+    val existingFieldNames = existingSchema.asScala.map(_.getName).toList
+    val newFields = incomingFieldsMap.keys.filterNot(existingFieldNames.toSet)
+    val oldFields = existingFieldNames.filterNot(incomingFieldsMap.keys.toSet)
+    if (oldFields.nonEmpty) {
+      throw new Exception(
+        s"existing table contains fields not present in the new schema:  $oldFields"
+      )
+    }
+
+    def updateSchema() = {
+      val newBqSchema = BigQueryUtils.bqSchema(incomingSchema)
+      val updatedTable =
+        table.toBuilder.setDefinition(StandardTableDefinition.of(newBqSchema)).build()
+      updatedTable.update()
+    }
+
+    if (allowFieldAddition) {
+      if (newFields.nonEmpty) {
+        logger.info(s"The following new columns have been detected: ${newFields.toList}")
+        // make sure all new fields are nullable
+        newFields.foreach { fieldName =>
+          val field = incomingFieldsMap(fieldName)
+          if (!field.nullable) {
+            throw new Exception(s"Cannot add required $field with name $fieldName")
+          }
+        }
+        updateSchema()
+        logger.info("Empty column(s) successfully added to table")
+      }
+    }
+    if (allowFieldRelaxation && oldFields.isEmpty && newFields.isEmpty) {
+      updateSchema()
+      logger.info("Empty column(s) successfully added to table")
+    }
+  }
+
   /** In the queryFilter, the user may now write something like this : `partitionField in last(3)`
     * this will be translated to partitionField between partitionStart and partitionEnd
     *
@@ -1022,38 +1069,29 @@ trait IngestionJob extends SparkJob {
     mergeOptions: MergeOptions
   ): (DataFrame, Option[List[String]]) = {
     // When merging to BigQuery, load existing DF from BigQuery
+    session.conf.getAll.foreach(println)
     val tableMetadata = BigQuerySparkJob.getTable(session, domain.name, schema.name)
     tableMetadata.table
       .map { table =>
-        if (
-          table.getDefinition
-            .asInstanceOf[StandardTableDefinition]
-            .getSchema
-            .getFields
-            .size() == withScriptFieldsDF.schema.fields.length
-        ) {
-          val bqTable = s"${domain.name}.${schema.name}"
-          // We provided the acceptedDF schema here since BQ lose the required / nullable information of the schema
-          val existingBQDFWithoutFilter = session.read
-            .schema(converIntToLongInSchema(withScriptFieldsDF.schema))
-            .format("com.google.cloud.spark.bigquery")
-            .option("table", bqTable)
+        updateBqTableSchema(table, withScriptFieldsDF.schema)
+        val bqTable = s"${domain.name}.${schema.name}"
+        // We provide the acceptedDF schema here since BQ lose the required / nullable information of the schema
+        val existingBQDFWithoutFilter = session.read
+          .schema(converIntToLongInSchema(withScriptFieldsDF.schema))
+          .format("com.google.cloud.spark.bigquery")
+          .option("table", bqTable)
 
-          val existingBigQueryDFReader = (mergeOptions.queryFilter, metadata.sink) match {
-            case (Some(_), Some(BigQuerySink(_, _, Some(_), _, _, _, _))) =>
-              val partitions =
-                tableMetadata.biqueryClient.listPartitions(table.getTableId).asScala.toList
-              val filter = mergeOptions.buidlBQQuery(partitions, options)
-              existingBQDFWithoutFilter
-                .option("filter", filter.getOrElse(throw new Exception("should never happen")))
-            case (_, _) =>
-              existingBQDFWithoutFilter
-          }
-          processMerge(withScriptFieldsDF, existingBigQueryDFReader.load(), mergeOptions)
-        } else
-          throw new RuntimeException(
-            "Input Dataset and existing HDFS dataset do not have the same number of columns. Check for changes in the dataset schema ?"
-          )
+        val existingBigQueryDFReader = (mergeOptions.queryFilter, metadata.sink) match {
+          case (Some(_), Some(BigQuerySink(_, _, Some(_), _, _, _, _))) =>
+            val partitions =
+              tableMetadata.biqueryClient.listPartitions(table.getTableId).asScala.toList
+            val filter = mergeOptions.buidlBQQuery(partitions, options)
+            existingBQDFWithoutFilter
+              .option("filter", filter.getOrElse(throw new Exception("should never happen")))
+          case (_, _) =>
+            existingBQDFWithoutFilter
+        }
+        processMerge(withScriptFieldsDF, existingBigQueryDFReader.load(), mergeOptions)
       }
       .getOrElse {
         val emptyExistingDF = session
