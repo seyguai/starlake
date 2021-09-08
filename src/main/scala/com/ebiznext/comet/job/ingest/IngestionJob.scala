@@ -1052,7 +1052,7 @@ trait IngestionJob extends SparkJob {
       incomingRequiredFields.foreach { newFieldName =>
         val existingField = existingFields.get(newFieldName)
         existingField match {
-          case None => logger.info("This is a new field, it is handled by alloFieldAddition Above")
+          case None => logger.info("This is a new field, it is handled by allowFieldAddition Above")
           case Some(true) =>
             throw new Exception(
               s"Merge failed because existing field is nullable but incoming one is required -> $newFieldName"
