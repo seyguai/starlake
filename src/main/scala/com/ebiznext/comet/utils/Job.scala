@@ -64,8 +64,10 @@ trait JobBase extends StrictLogging {
 
 trait SparkJob extends JobBase {
 
+  def extraSparkConf(): Map[String, String] = Map.empty
+
   lazy val sparkEnv: SparkEnv = {
-    new SparkEnv(name)
+    new SparkEnv(name, extraSparkConf())
   }
 
   protected def registerUdf(udf: String): Unit = {

@@ -18,7 +18,7 @@ import com.google.cloud.bigquery.{
 import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.functions.{col, date_format}
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.JavaConverters._
@@ -30,6 +30,18 @@ class BigQuerySparkJob(
 )(implicit val settings: Settings)
     extends SparkJob
     with BigQueryJobBase {
+
+  /** Set extra spark conf here otherwise it will be too late once the spark session is created.
+    * @return
+    */
+  override def extraSparkConf(): Map[String, String] =
+    if (cliConfig.writeDisposition == "WRITE_TRUNCATE")
+      Map(
+        "spark.datasource.bigquery.allowFieldAddition"   -> "false",
+        "spark.datasource.bigquery.allowFieldRelaxation" -> "false"
+      )
+    else
+      Map.empty
 
   override def name: String = s"bqload-${cliConfig.outputDataset}-${cliConfig.outputTable}"
 
@@ -119,6 +131,12 @@ class BigQuerySparkJob(
   }
 
   def runSparkConnector(): Try[SparkJobResult] = {
+    def saveDfWithOptions(finalDF: DataFrameWriter[Row], saveMode: SaveMode) = {
+      logger.info(s"${cliConfig.options}")
+      cliConfig.options
+        .foldLeft(finalDF) { case (df, (k, v)) => df.option(k, v) }
+        .save()
+    }
     prepareConf()
     Try {
       val cacheStorageLevel =
@@ -181,6 +199,9 @@ class BigQuerySparkJob(
           cliConfig.partitionsToUpdate match {
             case None =>
             case Some(partitionsToUpdate) =>
+              logger.info(
+                s"Updating partitions $partitionsToUpdate overwriting partition ${partitionField} in The BQ Table $bqTable"
+              )
               partitionsToUpdate.foreach { partitionToUpdate =>
                 // if partitionToUpdate is not in the list of partitions to merge. It means that it need to be deleted
                 // this case happen when there is no more than a single element in the partition
@@ -194,10 +215,7 @@ class BigQuerySparkJob(
                     .option("datePartition", partitionToUpdate)
                     .option("table", bqTable)
                     .option("intermediateFormat", intermediateFormat)
-
-                  cliConfig.options
-                    .foldLeft(finalEmptyDF) { case (df, (k, v)) => df.option(k, v) }
-                    .save()
+                  saveDfWithOptions(finalEmptyDF, SaveMode.Overwrite)
                 }
               }
           }
@@ -213,18 +231,16 @@ class BigQuerySparkJob(
                 .option("datePartition", partitionStr)
                 .option("table", bqTable)
                 .option("intermediateFormat", intermediateFormat)
-            val finalDFWithOptions = cliConfig.options
-              .foldLeft(finalDF) { case (df, (k, v)) => df.option(k, v) }
             cliConfig.partitionsToUpdate match {
               case None =>
-                finalDFWithOptions.save()
+                saveDfWithOptions(finalDF, SaveMode.Overwrite)
               case Some(partitionsToUpdate) =>
                 // We only overwrite partitions containing updated or newly added elements
                 if (partitionsToUpdate.contains(partitionStr)) {
                   logger.info(
                     s"Optimization -> Writing partition : $partitionStr"
                   )
-                  finalDFWithOptions.save()
+                  saveDfWithOptions(finalDF, SaveMode.Overwrite)
                 } else {
                   logger.info(
                     s"Optimization -> Not writing partition : $partitionStr"
@@ -247,8 +263,7 @@ class BigQuerySparkJob(
             .format("com.google.cloud.spark.bigquery")
             .option("table", bqTable)
             .option("intermediateFormat", intermediateFormat)
-
-          cliConfig.options.foldLeft(finalDF)((w, kv) => w.option(kv._1, kv._2)).save()
+          saveDfWithOptions(finalDF, saveMode)
       }
 
       val stdTableDefinitionAfter =
