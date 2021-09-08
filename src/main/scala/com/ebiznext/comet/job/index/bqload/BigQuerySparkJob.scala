@@ -36,12 +36,12 @@ class BigQuerySparkJob(
     */
   override def extraSparkConf(): Map[String, String] =
     if (cliConfig.writeDisposition == "WRITE_TRUNCATE")
-      Map(
+      cliConfig.options ++ Map(
         "spark.datasource.bigquery.allowFieldAddition"   -> "false",
         "spark.datasource.bigquery.allowFieldRelaxation" -> "false"
       )
     else
-      Map.empty
+      cliConfig.options
 
   override def name: String = s"bqload-${cliConfig.outputDataset}-${cliConfig.outputTable}"
 
