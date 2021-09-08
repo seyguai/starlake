@@ -1046,7 +1046,7 @@ trait IngestionJob extends SparkJob {
     }
     if (allowFieldRelaxation) {
       val existingFields = existingSchema.asScala
-        .map(f => (f.getName, Option(f.getMode).map(_ == Field.Mode.NULLABLE).getOrElse(true)))
+        .map(f => (f.getName, Option(f.getMode).forall(_ == Field.Mode.NULLABLE)))
         .toMap
       val incomingRequiredFields = incomingSchema.fields.filter(!_.nullable).map(_.name)
       incomingRequiredFields.foreach { newFieldName =>
