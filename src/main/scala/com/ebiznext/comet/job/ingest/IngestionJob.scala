@@ -1044,7 +1044,22 @@ trait IngestionJob extends SparkJob {
         logger.info("Empty column(s) successfully added to table")
       }
     }
-    if (allowFieldRelaxation && oldFields.isEmpty && newFields.isEmpty) {
+    if (allowFieldRelaxation) {
+      val existingFields = existingSchema.asScala
+        .map(f => (f.getName, Option(f.getMode).map(_ == Field.Mode.NULLABLE).getOrElse(true)))
+        .toMap
+      val incomingRequiredFields = incomingSchema.fields.filter(!_.nullable).map(_.name)
+      incomingRequiredFields.foreach { newFieldName =>
+        val existingField = existingFields.get(newFieldName)
+        existingField match {
+          case None => logger.info("This is a new field, it is handled by alloFieldAddition Above")
+          case Some(true) =>
+            throw new Exception(
+              s"Merge failed because existing field is nullable but incoming one is required -> $newFieldName"
+            )
+          case Some(false) => // unchanged field
+        }
+      }
       updateSchema()
       logger.info("Empty column(s) successfully added to table")
     }
