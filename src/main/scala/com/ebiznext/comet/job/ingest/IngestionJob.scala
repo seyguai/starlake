@@ -371,8 +371,13 @@ trait IngestionJob extends SparkJob {
   ): (DataFrame, Option[List[String]]) = {
     val (mergedDF, partitionsToUpdate) = schema.merge
       .map { mergeOptions =>
-        if (metadata.getSink().map(_.`type`).getOrElse(SinkType.None) == SinkType.BQ) {
+        val sinkType = metadata.getSink().map(_.`type`).getOrElse(SinkType.None)
+        if (sinkType == SinkType.BQ) {
           mergeFromBQ(finalAcceptedDF, mergeOptions)
+        } else if (sinkType == SinkType.JDBC) {
+          // mergeFromBQ(finalAcceptedDF, mergeOptions)
+          //TODO: Merge from JDBC datasource
+          throw new Exception("Merge from JDBC datasource Not yet supported")
         } else {
           (mergeFromParquet(acceptedPath, finalAcceptedDF, mergeOptions), None)
         }
