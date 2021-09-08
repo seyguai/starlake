@@ -24,12 +24,15 @@ import com.ebiznext.comet.config.Settings
 import com.ebiznext.comet.schema.handlers.{SchemaHandler, StorageHandler}
 import com.ebiznext.comet.schema.model.Schema
 import com.ebiznext.comet.utils.{JobResult, SparkJob, SparkJobResult}
-import com.softwaremill.sttp._
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.StructField
+import org.apache.commons.httpclient.auth.AuthScope
+import org.apache.commons.httpclient.UsernamePasswordCredentials
+import org.apache.commons.httpclient.methods.{DeleteMethod, PutMethod, StringRequestEntity}
 
 import scala.util.{Failure, Success, Try}
 import org.apache.spark.sql.functions._
+
 import scala.collection.JavaConverters._
 
 class ESLoadJob(
@@ -111,30 +114,27 @@ class ESLoadJob(
     val username = esOptions.get("net.http.auth.user")
     val password = esOptions.get("net.http.auth.password")
 
-    implicit val backend = HttpURLConnectionBackend()
-    val authSttp = for {
-      u <- username
-      p <- password
-    } yield {
-      sttp.auth.basic(u, p)
+    val client = new org.apache.commons.httpclient.HttpClient()
+    (username, password) match {
+      case (Some(username), Some(password)) =>
+        val defaultcreds = new UsernamePasswordCredentials(username, password)
+        client
+          .getState()
+          .setCredentials(new AuthScope(host, port), defaultcreds)
+      case (_, _) =>
     }
 
-    val templateUri =
-      uri"$protocol://$host:$port/_template/${cliConfig.getIndexName()}"
-    val requestDel = authSttp
-      .getOrElse(sttp)
-      .delete(templateUri)
-      .contentType("application/json")
-    val _ = requestDel.send()
+    val templateUri = s"$protocol://$host:$port/_template/${cliConfig.getIndexName()}"
+    val delMethod = new DeleteMethod(templateUri)
+    delMethod.setRequestHeader("Content-Type", "application/json")
+    val _ = client.executeMethod(delMethod)
 
-    val requestPut = authSttp
-      .getOrElse(sttp)
-      .body(content)
-      .put(templateUri)
-      .contentType("application/json")
+    val putMethod = new PutMethod(templateUri)
+    val requestEntity = new StringRequestEntity(content, "application/json", "UTF-8")
+    putMethod.setRequestEntity(requestEntity)
+    val responseCode = client.executeMethod(putMethod)
 
-    val responsePut = requestPut.send()
-    val ok = (200 to 299) contains responsePut.code
+    val ok = (200 to 299) contains responseCode
     if (ok) {
       val allConf = esOptions.toList ++ esCliConf.toList
       logger.whenDebugEnabled {
