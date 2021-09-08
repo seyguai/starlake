@@ -21,7 +21,8 @@
 package com.ebiznext.comet.schema.model
 
 import com.ebiznext.comet.TestHelper
-import com.fasterxml.jackson.databind.exc.InvalidTypeIdException
+
+import java.io.IOException
 
 class SinkSpec extends TestHelper {
   new WithSettings() {
@@ -144,7 +145,7 @@ class SinkSpec extends TestHelper {
     }
 
     "parsing KAFKA sink" should "fail" in {
-      assertThrows[InvalidTypeIdException] {
+      assertThrows[IOException] {
         mapper.readValue(
           """
           |name: "sink"
