@@ -22,6 +22,11 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
+  def scalaReflection(scalaVersion: String) =
+    Seq(
+      "org.scala-lang" % "scala-reflect" % scalaVersion
+    )
+
   val jacksonExclusions = Seq(
     ExclusionRule(organization = "com.fasterxml.jackson.core"),
     ExclusionRule(organization = "com.fasterxml.jackson.databind"),
