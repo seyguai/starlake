@@ -94,14 +94,6 @@ object Dependencies {
     "org.scalatra.scalate" %% "scalate-core" % Versions.scalate
   )
 
-  val akkaHttp = Seq(
-    "com.typesafe.akka" %% "akka-http" % Versions.akkaHttp
-  )
-
-  val akkaStream = Seq(
-    "com.typesafe.akka" %% "akka-stream" % Versions.akkaStream
-  )
-
   val kafkaClients = Seq(
     "org.apache.kafka" % "kafka-clients" % Versions.kafkaClients
   )
@@ -189,5 +181,5 @@ object Dependencies {
 
   val dependencies =
     scalate ++ logging ++ typedConfigs ++ betterfiles ++ scalaTest ++ scopt ++ hadoop ++ sparkExtras ++ testcontainers ++
-    sttp ++ gcp ++ azure ++ h2 ++ excelClientApi ++ akkaHttp ++ akkaStream ++ kafkaClients ++ graphviz // ++ atlas
+    sttp ++ gcp ++ azure ++ h2 ++ excelClientApi ++ kafkaClients ++ graphviz // ++ atlas
 }
