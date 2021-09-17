@@ -22,7 +22,6 @@ import sbt.{ExclusionRule, _}
 
 object Dependencies {
 
-
   val jacksonExclusions = Seq(
     ExclusionRule(organization = "com.fasterxml.jackson.core"),
     ExclusionRule(organization = "com.fasterxml.jackson.databind"),
