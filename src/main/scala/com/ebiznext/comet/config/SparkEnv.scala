@@ -56,6 +56,7 @@ class SparkEnv(name: String, extraSparkConf: Map[String, String] = Map.empty)(im
       .set("spark.app.id", appName)
 
     val withExtraConf = extraSparkConf.foldLeft(thisConf) { case (conf, (k, v)) => conf.set(k, v) }
+
     logger.whenDebugEnabled {
       withExtraConf.getAll.foreach { case (k, v) => logger.debug(s"$k=$v") }
     }

@@ -15,7 +15,7 @@ class ConnectionLoadJob(
   /** Set extra spark conf here otherwise it will be too late once the spark session is created.
     * @return
     */
-  override def extraSparkConf(): Map[String, String] = cliConfig.options
+  override def withExtraSparkConf(): Map[String, String] = cliConfig.options
 
   override def name: String = s"jdbcload-JDBC-${cliConfig.outputTable}"
 

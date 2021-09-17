@@ -2,9 +2,7 @@
 
 # 0.2.7
 __New feature__:
-
-__Bug Fix__:
-- Support Merge on BigQuery
+- Support merging dataset with updated schema
 
 # 0.2.6
 __New feature__:
