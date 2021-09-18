@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+    <channel>
+        <title>Quickly Build Optimized Big &amp; Fast Data Pipelines Blog</title>
+        <link>https://starlake-ai.github.io/starlake/blog</link>
+        <description>Quickly Build Optimized Big &amp; Fast Data Pipelines Blog</description>
+        <lastBuildDate>Mon, 26 Apr 2021 00:00:00 GMT</lastBuildDate>
+        <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
+        <generator>https://github.com/jpmonette/feed</generator>
+        <item>
+            <title><![CDATA[Bonjour]]></title>
+            <link>https://starlake-ai.github.io/starlake/blog/bonjour</link>
+            <guid>bonjour</guid>
+            <pubDate>Mon, 26 Apr 2021 00:00:00 GMT</pubDate>
+            <description><![CDATA[Pipelining big data fast is fun :)]]></description>
+        </item>
+    </channel>
+</rss>
